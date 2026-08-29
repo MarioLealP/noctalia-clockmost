@@ -1,0 +1,14 @@
+# Committed; Noctalia reads it via `git show HEAD:catalog.toml`.
+
+[[plugin]]
+id = "benylin/clockmost"
+name = "clockmost"
+version = "1.0.0"
+updated_at = 1788018206
+added_at = 1788018206
+author = "benylin"
+license = "MIT"
+icon = "server"
+description = "clockmost home-server status on the Noctalia bar — pending updates, alerts, deploy state, container health."
+plugin_api = 3
+tags = ["clockmost", "server", "monitoring", "homelab"]

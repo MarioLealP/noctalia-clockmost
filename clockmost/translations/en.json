@@ -1,0 +1,7 @@
+{
+  "settings.ssh_host.label": "SSH host for the server (must reach `clockmost-status`)",
+  "settings.poll_seconds.label": "Refresh interval (seconds)",
+  "settings.show_count.label": "Show the updates + alerts count on the glyph",
+  "settings.arcane_url.label": "URL opened on right-click (Arcane)",
+  "settings.prs_url.label": "URL opened on middle-click (infra repo PRs)"
+}
