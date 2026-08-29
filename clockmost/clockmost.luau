@@ -7,7 +7,11 @@
 -- its existing passwordless SSH to `clockmost-claude`.
 --
 -- The glyph is the glance; left-click opens the detail panel (main.luau), which
--- reads the same snapshot from shared state.
+-- reads the same snapshot from shared state ("clockmost.snapshot").
+--
+-- The refresh loop is Noctalia's re-arming one-shot: `update()` (NOT `onUpdate`)
+-- is the tick hook, and it must call setUpdateInterval() again every tick or the
+-- timer stops after one fire.
 
 local STATE_KEY = "clockmost.snapshot"
 local PANEL = "benylin/clockmost:main"
@@ -23,6 +27,7 @@ local SSH_HOST, POLL_MS, SHOW_COUNT, ARCANE_URL, PRS_URL
 local function loadCfg()
   SSH_HOST   = tostring(cfg("ssh_host", "clockmost-claude"))
   POLL_MS    = math.floor((tonumber(cfg("poll_seconds")) or 90) * 1000)
+  if POLL_MS < 30000 then POLL_MS = 30000 end
   SHOW_COUNT = cfg("show_count", true) == true
   ARCANE_URL = tostring(cfg("arcane_url", "https://arcane.clockmost.com"))
   PRS_URL    = tostring(cfg("prs_url", "https://git.clockmost.com/Benylin/clockmost-infra/pulls"))
@@ -31,23 +36,20 @@ loadCfg()
 
 local data = nil
 local err  = nil
+local inFlight = false
 
 local GLYPH = { ok = "server", warn = "alert-triangle", crit = "alert-octagon" }
 local COLOR = { ok = "primary", warn = "warning", crit = "error" }
 
+local function log(m) if noctalia.log then noctalia.log("clockmost/widget: " .. m) end end
+
 local function render()
-  if err then
-    barWidget.setGlyph("cloud-off")
-    barWidget.setGlyphColor("on_surface_variant")
-    barWidget.setText("")
-    barWidget.setTooltip("clockmost: " .. err .. "  (left-click for panel)")
-    return
-  end
   if not data then
-    barWidget.setGlyph("server")
+    barWidget.setGlyph(err and "cloud-off" or "server")
     barWidget.setGlyphColor("on_surface_variant")
     barWidget.setText("")
-    barWidget.setTooltip("clockmost: loading…")
+    barWidget.setTooltip(err and ("clockmost: " .. err .. "  (left-click for panel)")
+      or "clockmost: loading…")
     return
   end
   local d = data
@@ -65,32 +67,43 @@ local function render()
     (c.up or 0), (c.total or 0)))
 end
 
-local function poll()
-  local cmd = "ssh -o ConnectTimeout=6 -o BatchMode=yes -o StrictHostKeyChecking=accept-new "
-    .. SSH_HOST .. " clockmost-status"
-  noctalia.runAsync(cmd, function(res)
-    if not res or res.timedOut then
-      err, data = "ssh timed out", nil
-      render(); return
-    end
-    if (res.exitCode or 1) ~= 0 or not res.stdout or res.stdout == "" then
-      err, data = "ssh exit " .. tostring(res.exitCode), nil
-      render(); return
-    end
-    local ok, d = pcall(function() return noctalia.json.decode(res.stdout) end)
-    if ok and type(d) == "table" and d.status then
-      data, err = d, nil
-      if noctalia.state and noctalia.state.set then
-        noctalia.state.set(STATE_KEY, res.stdout)
-      end
-    else
-      err = "bad JSON from clockmost-status"
-    end
-    render()
-  end, 15000)
+-- Accept the result whenever stdout parses as our snapshot — some Noctalia
+-- builds don't put `exitCode` on a successful runAsync result.
+local function adopt(res)
+  inFlight = false
+  if not res or res.timedOut then
+    err = "ssh timed out"; log("timeout"); render(); return
+  end
+  local out = res.stdout
+  if type(out) ~= "string" or out == "" then
+    err = "no output (exit " .. tostring(res.exitCode) .. ")"; log(err); render(); return
+  end
+  local ok, d = pcall(function() return noctalia.json.decode(out) end)
+  if ok and type(d) == "table" and d.status then
+    data, err = d, nil
+    if noctalia.state and noctalia.state.set then noctalia.state.set(STATE_KEY, out) end
+    log("ok status=" .. tostring(d.status)
+      .. " updates=" .. tostring(d.updates and d.updates.n)
+      .. " alerts=" .. tostring(d.alerts and d.alerts.n))
+  else
+    err = "bad JSON from clockmost-status"; log(err .. ": " .. out:sub(1, 120))
+  end
+  render()
 end
 
-function onUpdate() poll() end
+local function poll()
+  if inFlight then return end
+  inFlight = true
+  local cmd = "ssh -o ConnectTimeout=6 -o BatchMode=yes -o StrictHostKeyChecking=accept-new "
+    .. SSH_HOST .. " clockmost-status"
+  noctalia.runAsync(cmd, adopt, 15000)
+end
+
+-- Noctalia's tick hook. Re-arm the interval every call or the loop dies.
+function update()
+  noctalia.setUpdateInterval(POLL_MS)
+  poll()
+end
 
 function onClick()
   noctalia.runAsync("noctalia msg panel-open '" .. PANEL .. "'", function() end, 5000)
@@ -108,6 +121,15 @@ function onConfigChanged()
   loadCfg()
   noctalia.setUpdateInterval(POLL_MS)
   poll()
+end
+
+-- A panel refresh republishes the snapshot; reflect it on the glyph immediately.
+if noctalia.state and noctalia.state.watch then
+  noctalia.state.watch(STATE_KEY, function(raw)
+    if type(raw) ~= "string" or raw == "" then return end
+    local ok, d = pcall(function() return noctalia.json.decode(raw) end)
+    if ok and type(d) == "table" and d.status then data, err = d, nil; render() end
+  end)
 end
 
 noctalia.setUpdateInterval(POLL_MS)

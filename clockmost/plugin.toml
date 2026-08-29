@@ -8,7 +8,7 @@
 
 id = "benylin/clockmost"
 name = "clockmost"
-version = "1.1.0"
+version = "1.2.0"
 plugin_api = 3
 author = "benylin"
 license = "MIT"
@@ -16,6 +16,42 @@ icon = "server"
 description = "clockmost home-server status on the bar — pending updates, alerts, deploy state, container health."
 dependencies = []
 tags = ["clockmost", "server", "monitoring", "bar", "homelab"]
+
+# Plugin-scoped settings — declared at the top level so BOTH the widget and the
+# panel can read them via noctalia.getConfig (a [[widget.setting]] is invisible
+# to the panel and logs an "undeclared setting" warning).
+[[setting]]
+key = "ssh_host"
+type = "string"
+label_key = "settings.ssh_host.label"
+default = "clockmost-claude"
+
+[[setting]]
+key = "poll_seconds"
+type = "double"
+label_key = "settings.poll_seconds.label"
+default = 90.0
+min = 30.0
+max = 600.0
+step = 30.0
+
+[[setting]]
+key = "show_count"
+type = "bool"
+label_key = "settings.show_count.label"
+default = true
+
+[[setting]]
+key = "arcane_url"
+type = "string"
+label_key = "settings.arcane_url.label"
+default = "https://arcane.clockmost.com"
+
+[[setting]]
+key = "prs_url"
+type = "string"
+label_key = "settings.prs_url.label"
+default = "https://git.clockmost.com/Benylin/clockmost-infra/pulls"
 
 [[panel]]
 id = "main"
@@ -26,36 +62,3 @@ height = 560
 [[widget]]
 id = "clockmost"
 entry = "clockmost.luau"
-
-  [[widget.setting]]
-  key = "ssh_host"
-  type = "string"
-  label_key = "settings.ssh_host.label"
-  default = "clockmost-claude"
-
-  [[widget.setting]]
-  key = "poll_seconds"
-  type = "double"
-  label_key = "settings.poll_seconds.label"
-  default = 90.0
-  min = 30.0
-  max = 600.0
-  step = 30.0
-
-  [[widget.setting]]
-  key = "show_count"
-  type = "bool"
-  label_key = "settings.show_count.label"
-  default = true
-
-  [[widget.setting]]
-  key = "arcane_url"
-  type = "string"
-  label_key = "settings.arcane_url.label"
-  default = "https://arcane.clockmost.com"
-
-  [[widget.setting]]
-  key = "prs_url"
-  type = "string"
-  label_key = "settings.prs_url.label"
-  default = "https://git.clockmost.com/Benylin/clockmost-infra/pulls"

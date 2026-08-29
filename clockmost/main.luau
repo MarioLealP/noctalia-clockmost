@@ -2,8 +2,9 @@
 -- clockmost — the detail panel. Opened by a left-click on the bar widget.
 --
 -- Reads the shared snapshot the widget stores (state key "clockmost.snapshot"),
--- and also re-polls `ssh <host> clockmost-status` itself on open / refresh so
--- the panel is never stale. Actions shell out over the same SSH:
+-- watches it for live updates, and also re-polls `ssh <host> clockmost-status`
+-- itself on open / refresh so the panel is never stale. Actions shell out over
+-- the same SSH:
 --   * open a PR / Arcane / the PR list  -> xdg-open
 --   * "Deploy now"  -> sudo systemctl start clockmost-deploy.service
 
@@ -30,6 +31,7 @@ local note = nil       -- transient status line (e.g. "deploy triggered")
 local busy = false
 
 -- ------------------------------------------------------------------ helpers ---
+local function log(m) if noctalia.log then noctalia.log("clockmost/panel: " .. m) end end
 local function sh(s) return "'" .. tostring(s):gsub("'", "'\\''") .. "'" end
 local function openUrl(u) noctalia.runAsync("xdg-open " .. sh(u), function() end, 5000) end
 
@@ -43,15 +45,26 @@ local render  -- fwd
 
 local function repoll()
   busy = true; if render then render() end
-  local cmd = "ssh -o ConnectTimeout=6 -o BatchMode=yes " .. SSH_HOST .. " clockmost-status"
+  local cmd = "ssh -o ConnectTimeout=6 -o BatchMode=yes -o StrictHostKeyChecking=accept-new "
+    .. SSH_HOST .. " clockmost-status"
   noctalia.runAsync(cmd, function(res)
     busy = false
-    if res and not res.timedOut and (res.exitCode or 1) == 0 and res.stdout and res.stdout ~= "" then
-      local d = decode(res.stdout)
+    local out = res and res.stdout
+    if res and res.timedOut then
+      log("repoll timed out")
+    elseif type(out) == "string" and out ~= "" then
+      local d = decode(out)
       if d then
         data = d
-        if noctalia.state and noctalia.state.set then noctalia.state.set(STATE_KEY, res.stdout) end
+        if noctalia.state and noctalia.state.set then noctalia.state.set(STATE_KEY, out) end
+        log("repoll ok: status=" .. tostring(d.status)
+          .. " updates=" .. tostring(d.updates and d.updates.n)
+          .. " alerts=" .. tostring(d.alerts and d.alerts.n))
+      else
+        log("repoll bad JSON: " .. out:sub(1, 120))
       end
+    else
+      log("repoll no output (exit " .. tostring(res and res.exitCode) .. ")")
     end
     if render then render() end
   end, 15000)
@@ -65,7 +78,7 @@ function onDeploy()
       .. " sudo -n systemctl start clockmost-deploy.service",
     function(res)
       busy = false
-      note = ((res and (res.exitCode or 1) == 0) and "deploy started — refreshing in a moment"
+      note = ((res and (res.exitCode or 0) == 0) and "deploy started — refreshing in a moment"
         or "deploy failed to start")
       if render then render() end
       noctalia.runAsync("sleep 12", function() repoll() end, 20000)
@@ -166,9 +179,10 @@ render = function()
     ui.glyph({ name = d and (STATUS_GLY[d.status] or "server") or "server", size = 20,
       color = d and (STATUS_COL[d.status] or "on_surface_variant") or "on_surface_variant" }),
     ui.label({ text = "clockmost", fontSize = 16, fontWeight = "bold", color = "primary" }),
-    ui.label({ text = statusWord, color = d and (STATUS_COL[d.status] or "on_surface_variant") or "on_surface_variant",
+    ui.label({ text = busy and "refreshing…" or statusWord,
+      color = d and (STATUS_COL[d.status] or "on_surface_variant") or "on_surface_variant",
       flexGrow = 1 }),
-    ui.button({ glyph = busy and "loader" or "refresh", variant = "secondary", onClick = "onRefresh" }),
+    ui.button({ glyph = "refresh", variant = "secondary", onClick = "onRefresh" }),
     ui.button({ glyph = "close", variant = "secondary", onClick = "onClosePanel" }),
   })
 
@@ -188,8 +202,18 @@ render = function()
   panel.render(ui.column({ padding = PAD, gap = 8, flexGrow = 1 }, kids))
 end
 
+-- Live-follow the shared snapshot: when the widget's poll republishes it, an
+-- open panel updates without the user pressing Refresh.
+if noctalia.state and noctalia.state.watch then
+  noctalia.state.watch(STATE_KEY, function(raw)
+    if type(raw) ~= "string" or raw == "" then return end
+    local d = decode(raw)
+    if d then data = d; if render then render() end end
+  end)
+end
+
 function onOpen(_context)
-  panel.setWantsSecondTicks(false)
+  if panel.setWantsSecondTicks then panel.setWantsSecondTicks(false) end
   note = nil
   local raw = noctalia.state.get and noctalia.state.get(STATE_KEY)
   if type(raw) == "string" and raw ~= "" then data = decode(raw) end
