@@ -5,21 +5,25 @@
 #   left-click   -> the detail panel (updates, alerts, deploy, containers, disk)
 #   right-click  -> Arcane
 #   middle-click -> the infra repo's pull requests
+#
+# The [[service]] entry (notify-svc.luau) polls the ntfy `clockmost` topic over
+# the same SSH and raises a desktop toast for each new message — deploys,
+# healthcheck / CrowdSec / Caddy alerts, backups.
 
 id = "benylin/clockmost"
 name = "clockmost"
-version = "1.3.0"
+version = "1.4.0"
 plugin_api = 3
 author = "benylin"
 license = "MIT"
 icon = "server"
-description = "clockmost home-server status on the bar — pending updates, alerts, deploy state, container health."
+description = "clockmost home-server status on the bar — pending updates, alerts, deploy state, container health, live ntfy toasts."
 dependencies = []
 tags = ["clockmost", "server", "monitoring", "bar", "homelab"]
 
-# Plugin-scoped settings — declared at the top level so BOTH the widget and the
-# panel can read them via noctalia.getConfig (a [[widget.setting]] is invisible
-# to the panel and logs an "undeclared setting" warning).
+# Plugin-scoped settings — declared at the top level so the widget, panel AND
+# service can all read them via noctalia.getConfig (a [[widget.setting]] is
+# invisible to the others and logs an "undeclared setting" warning).
 [[setting]]
 key = "ssh_host"
 type = "string"
@@ -53,6 +57,30 @@ type = "string"
 label_key = "settings.prs_url.label"
 default = "https://git.clockmost.com/Benylin/clockmost-infra/pulls"
 
+[[setting]]
+key = "toasts_enabled"
+type = "bool"
+label_key = "settings.toasts_enabled.label"
+default = true
+
+[[setting]]
+key = "toast_poll_seconds"
+type = "double"
+label_key = "settings.toast_poll_seconds.label"
+default = 25.0
+min = 10.0
+max = 300.0
+step = 5.0
+
+[[setting]]
+key = "toast_min_priority"
+type = "double"
+label_key = "settings.toast_min_priority.label"
+default = 3.0
+min = 1.0
+max = 5.0
+step = 1.0
+
 [[panel]]
 id = "main"
 entry = "main.luau"
@@ -62,3 +90,7 @@ height = 560
 [[widget]]
 id = "clockmost"
 entry = "clockmost.luau"
+
+[[service]]
+id = "notify-svc"
+entry = "notify-svc.luau"

@@ -3,5 +3,8 @@
   "settings.poll_seconds.label": "Refresh interval (seconds)",
   "settings.show_count.label": "Show the updates + alerts count on the glyph",
   "settings.arcane_url.label": "URL opened on right-click (Arcane)",
-  "settings.prs_url.label": "URL opened on middle-click (infra repo PRs)"
+  "settings.prs_url.label": "URL opened on middle-click (infra repo PRs)",
+  "settings.toasts_enabled.label": "Live desktop toasts for new ntfy notifications",
+  "settings.toast_poll_seconds.label": "Toast poll interval (seconds)",
+  "settings.toast_min_priority.label": "Minimum ntfy priority to toast (1=all, 4=high+ only, 5=urgent only)"
 }
