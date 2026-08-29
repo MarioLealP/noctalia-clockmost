@@ -3,8 +3,8 @@
 [[plugin]]
 id = "benylin/clockmost"
 name = "clockmost"
-version = "1.2.0"
-updated_at = 1788023081
+version = "1.3.0"
+updated_at = 1788027616
 added_at = 1788018206
 author = "benylin"
 license = "MIT"

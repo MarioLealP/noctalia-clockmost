@@ -41,6 +41,15 @@ local function decode(str)
   return nil
 end
 
+local function timeAgo(secs)
+  secs = tonumber(secs) or 0
+  if secs < 0 then secs = 0 end
+  if secs < 90 then return "just now" end
+  if secs < 3600 then return string.format("%dm ago", math.floor(secs / 60)) end
+  if secs < 86400 then return string.format("%dh ago", math.floor(secs / 3600)) end
+  return string.format("%dd ago", math.floor(secs / 86400))
+end
+
 local render  -- fwd
 
 local function repoll()
@@ -154,6 +163,28 @@ local function body()
     add(ui.label({ text = tostring(d.deploy.commit or "?"), opacity = 0.65, maxWidth = WRAP, maxLines = 2 }))
     if (d.deploy.rollback_recent or 0) > 0 then
       add(ui.label({ text = "(!) a rollback appears in the recent deploy log", color = "error" }))
+    end
+  end
+
+  -- recent notifications (ntfy `clockmost` topic)
+  local nt = (d.notify and d.notify.list) or {}
+  if #nt > 0 then
+    sep()
+    add(sectionTitle("Recent"))
+    local now = tonumber(d.ts) or 0
+    for i, m in ipairs(nt) do
+      if i > 5 then break end
+      local hi = (tonumber(m.p) or 3) >= 4
+      add(ui.column({ gap = 0 }, {
+        ui.row({ gap = 6, align = "center" }, {
+          ui.label({ text = tostring(m.ti or ""), maxWidth = WRAP - 70, maxLines = 2,
+            flexGrow = 1, color = hi and "error" or nil }),
+          ui.label({ text = timeAgo(now - (tonumber(m.t) or now)), opacity = 0.55 }),
+        }),
+        (m.m and m.m ~= "" and tostring(m.m) ~= tostring(m.ti))
+          and ui.label({ text = tostring(m.m), opacity = 0.65, maxWidth = WRAP, maxLines = 2 })
+          or nil,
+      }))
     end
   end
 

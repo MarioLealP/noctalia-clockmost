@@ -59,12 +59,17 @@ local function render()
   barWidget.setGlyphColor(COLOR[d.status] or "on_surface_variant")
   barWidget.setText((SHOW_COUNT and (nUp + nAl) > 0) and tostring(nUp + nAl) or "")
   local c = d.containers or {}
-  barWidget.setTooltip(string.format(
-    "clockmost — %s\n%d update%s · %d alert%s · %d/%d containers · left-click for detail",
+  local tip = string.format(
+    "clockmost — %s\n%d update%s · %d alert%s · %d/%d containers",
     tostring(d.status):upper(),
     nUp, (nUp == 1 and "" or "s"),
     nAl, (nAl == 1 and "" or "s"),
-    (c.up or 0), (c.total or 0)))
+    (c.up or 0), (c.total or 0))
+  local nt = (d.notify and d.notify.list) or {}
+  if nt[1] and nt[1].ti then
+    tip = tip .. "\nlatest: " .. tostring(nt[1].ti)
+  end
+  barWidget.setTooltip(tip .. "\nleft-click for detail")
 end
 
 -- Accept the result whenever stdout parses as our snapshot — some Noctalia
