@@ -27,3 +27,11 @@ passwordless SSH to the server (default host alias `clockmost-claude`).
 
 - SSH access to the server as a user that can run `clockmost-status`
 - `xdg-open` (for the click actions)
+
+## Live toasts
+
+The `notify-svc` service polls `ssh <ssh_host> clockmost-notifications` every
+`toast_poll_seconds` (default 25) and raises a desktop notification for each new
+message on the ntfy `clockmost` topic. `toast_min_priority` filters by ntfy
+priority (1 = everything, 4 = high+ only). `toasts_enabled = false` turns it off.
+The ntfy token stays on the server — the desktop only uses SSH.
